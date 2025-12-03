@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: nodejs
-        image: node:slim
+        image: jamesmckim/nodejs-image-csc478
         ports:
         - containerPort: 3000
         command: ["/bin/sh"]
