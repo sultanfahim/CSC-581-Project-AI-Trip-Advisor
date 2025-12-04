@@ -14,9 +14,9 @@ spec:
     spec:
       containers:
       - name: nodejs
-        image: jamesmckim/nodejs-image-csc478
+        image: jamesmckim/nodejs-image-csc478:JAmes
         ports:
-        - containerPort: 3000
+        - containerPort: 8080
         command: ["node"]
         args: ["server.js"]
 ---
@@ -29,7 +29,7 @@ spec:
     app: nodejs
   ports:
     - protocol: TCP
-      port: 80
-      targetPort: 3000
+      port: 8080
+      targetPort: 8080
       nodePort: 30000  # Expose port 30000 externally
   type: NodePort
