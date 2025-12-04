@@ -17,12 +17,8 @@ spec:
         image: jamesmckim/nodejs-image-csc478
         ports:
         - containerPort: 3000
-        command: ["/bin/sh"]
-        args:
-          - -c
-          - >-
-              tail -f /dev/null
- 
+        command: ["node"]
+        args: ["server.js"]
 ---
 apiVersion: v1
 kind: Service
