@@ -1,264 +1,210 @@
 # CSC-581-Project-AI-Trip-Advisor
 
-AI Trip Advisor: Cloud-Native Travel Planning Platform
-Sultan Fahim, James McKim, Karan Khademi, Will Huff, Clinton Uguwanyi
-Department of Computer Science, West Chester University of Pennsylvania
+AI Trip Advisor – Cloud-Native Travel Planning Platform
+CSC 581 – Final Project
 
-Abstract / Overview
-The AI Trip Advisor platform represents a novel demonstration of cloud-native engineering concepts applied to the domain of intelligent travel planning. By leveraging artificial intelligence, distributed systems, and container-orchestrated microservices, the platform transforms raw user preferences into complete, personalized itineraries within seconds. Built on Kubernetes and supported by scalable backend services, the system automates itinerary generation, integrates live geocoding data, and continuously adapts to changing user needs.
-From a marketing and real-world value standpoint, AI Trip Advisor showcases how cloud-native intelligence enables consumers to make faster, more informed travel decisions. Users can enter high-level travel goals, preferences, or constraints, and the platform’s backend orchestrates data retrieval, itinerary synthesis, and optimization using an AI Agent Service. This architecture demonstrates how modern organizations are shifting from monolithic travel-recommendation systems to AI-driven microservices capable of real-time personalization, failure resilience, and horizontal scalability.
-This report summarizes the system architecture, data-flow decisions, pod structure, routing logic, persistence design, and observed Kubernetes behaviors under scaling and self-healing conditions. It concludes with known limitations and future opportunities to enhance system automation, performance, and portability.
+Authors: Sultan Fahim · James McKim · Karan Khademi · Will Huff · Clinton Uguwanyi
+Department of Computer Science · West Chester University of Pennsylvania
 
-1. Architecture Recap
-The system follows a microservice architecture deployed on Kubernetes, consisting of:
-Front-end Pod (Node.js) – Provides UI, handles user input, makes API calls to the backend, and renders itinerary results.
+🧭 Overview
 
+The AI Trip Advisor is a cloud-native, Kubernetes-orchestrated travel-planning platform that turns raw user preferences into personalized travel itineraries using distributed microservices and AI-driven processing.
 
-Backend Pod (Python/Flask) – Orchestrates workflow, stores preferences, calls the AI Agent Service, and interacts with MongoDB.
+It showcases:
 
+Real-time itinerary generation
 
-AI Agent Service Pod – Executes itinerary generation using LLM processing, geocoding APIs, and summarization logic.
+Scalable microservices
 
+Automated data orchestration
 
-MongoDB Stateful Pod – Stores user profiles, trip requests, and generated itineraries.
+Intelligent LLM-assisted trip planning
 
+📄 Table of Contents
 
-Scheduler / Worker Logic – (If implemented) handles asynchronous travel-plan generation.
+Overview
 
+Architecture
 
-Ingress / Service Mesh – Routes traffic between pods and exposes the front-end to external users.
+System Workflow
 
+Pod Grouping
 
-1.1 Updated Architecture Diagram
+Routing & Services
 
-1.2 Architectural Choices
-Microservices over Monolith: Enables independent scaling and faster deployment cycles.
+Scaling & Self-Healing
 
+Persistence Design
 
-Containerization via Docker: Ensures reliable runtime environment consistency.
+Known Limitations
 
+Future Work
 
-Kubernetes Orchestration: Provides automatic rescheduling, health checks, load balancing, and external service access.
+🏗️ 1. Architecture Recap
 
+The system is built entirely using a microservices architecture, deployed on Kubernetes, and organized into multiple pods:
 
-Loose Coupling: Each component communicates via well-defined REST endpoints.
+Pods
+Pod	Purpose	Notes
+Frontend (Node.js)	User interface, input handling	Horizontally scalable
+Backend (Flask/Python)	Workflow orchestration; API gateway	System “brain”
+AI Agent Service	LLM itinerary generation + geocoding	CPU-intensive
+MongoDB Stateful Pod	Persistent storage	Uses PVC
+(Optional) Scheduler/Worker	Background itinerary jobs	For async workloads
+🖼️ 1.1 Architecture Diagram
 
+(Insert your diagram here — recommended: PNG or SVG)
 
+[ User ] → Frontend → Backend → AI Agent → External APIs
+                       ↓
+                    MongoDB
 
-2. Data-Flow Diagram & System Workflow
-The system’s operational workflow:
-User Input: User submits destination, interests, travel dates, budget, and constraints through the Node.js front-end.
+⚙️ 1.2 Architectural Choices
 
+Microservices over Monolith → Independent scaling & deployment
 
-Backend Validation: Backend pod receives input, logs the request, and writes the initial entry to MongoDB.
+Docker Containerization → Environment consistency
 
+Kubernetes Orchestration → Self-healing, scaling, service discovery
 
-AI Agent Invocation: Backend forwards structured preferences to the AI Agent Service.
+Loose Coupling → Replace components without breaking others
 
+🔄 2. Data Flow & System Workflow
 
-Geocoding + LLM Planning:
+High-level workflow:
 
+User Input (destination, interests, budget)
 
-The AI Agent retrieves location metadata via Google Maps APIs.
+Backend Validation
 
+AI Agent Invocation
 
-The LLM generates structured itineraries.
+Geocoding + LLM Itinerary Generation
 
+Itinerary Returned to Backend
 
-Additional services refine and segment daily activities.
+Persistence in MongoDB
 
+Frontend Rendering
 
-Response Assembly: The AI service returns a structured itinerary object to the backend.
-
-
-Persistence Step: Backend stores the finalized itinerary in MongoDB.
-
-
-Front-end Rendering: User receives a formatted, human-readable itinerary.
-
-
-Key principle:
-All components remain independently replaceable without affecting upstream/downstream services.
-
-3. Pod Grouping & Sidecar Decisions
+🧩 3. Pod Grouping & Sidecar Decisions
 3.1 Pod Grouping
-Pods were organized based on functional responsibility:
-Pod
-Primary Function
-Rationale
-Frontend Pod
-UI rendering, user authentication, request forwarding
-High-traffic component; benefits from horizontal scaling
-Backend Pod
-Orchestration, API gateway, service routing
-Acts as system “brain”
-AI Agent Pod
-LLM calls, geocoding, itinerary generation
-CPU-intensive logic isolated to avoid blocking other services
-MongoDB Pod
-Persistent data storage
-Requires StatefulSet behavior
+Pod	Function	Rationale
+Frontend	UI + traffic-heavy	Benefits from replicas
+Backend	Orchestration	Core controller
+AI Agent	LLM + geocoding	CPU-heavy tasks
+MongoDB	Data storage	Requires StatefulSet
+3.2 Sidecar Considerations
 
-3.2 Sidecar Decisions
-No sidecars were used in the final version, but we considered two:
-Logging Sidecar (Fluentd): Offloads log aggregation
+Sidecars considered but not implemented:
 
+Fluentd Logging Sidecar → log aggregation
 
-Caching Sidecar (Redis): For repeated API responses
+Redis Cache Sidecar → reduce geocoding calls
 
+We avoided these to keep the architecture minimal for demonstration.
 
-We opted not to implement them to preserve minimal complexity and ensure deterministic pod behavior for class demonstration.
+🌐 4. Services, Ingress & Routing
+4.1 Services
 
-4. Services, Ingress, and Routing
-4.1 Internal Services
-ClusterIP for backend ↔ AI Agent communication
+ClusterIP – backend → AI Agent
 
+ClusterIP – backend → MongoDB
 
-ClusterIP for backend ↔ MongoDB
+NodePort + Ingress – expose frontend
 
-
-NodePort / Ingress to expose the front-end externally
-
-
-4.2 Routing Logic
-Traffic flow:
-External request → Ingress
-
-
-Ingress → NodePort Front-end service
-
-
-Front-end → Backend ClusterIP service
-
-
-Backend → AI Agent ClusterIP service
-
-
-Backend ↔ MongoDB Stateful service
-
+4.2 Routing Diagram
+External User → Ingress → Frontend Service → Backend Service
+                                      ↓
+                               AI Agent Service
+                                      ↓
+                                  MongoDB
 
 4.3 Resilience Features
-Kubernetes restarts unhealthy pods via liveness/readiness probes
 
+Pod restarts via liveness/readiness probes
 
-DNS-based pod discovery ensures stable service access despite pod turnover
+DNS-based discovery for stable communication
 
+Load balancing across replicas
 
-Load-balancing across replica sets ensures stable request flow under load
-
-
-
-5. Scaling and Self-Healing Behavior
+📈 5. Scaling & Self-Healing Behavior
 5.1 Horizontal Scaling Tests
-We increased load using concurrent front-end requests. Observations:
-Frontend scaled efficiently with multiple replicas; CPU usage flattened across pods.
 
+Observations:
 
-Backend scaling helped latency, especially under heavy itinerary generation.
+Frontend scales very efficiently
 
+Backend scaling reduces latency
 
-AI Agent was a bottleneck under large LLM requests; adding replicas significantly improved throughput.
+AI Agent was the main bottleneck — adding replicas improves throughput
 
+5.2 Self-Healing Tests
 
-5.2 Self-Healing Observations
-Tests included:
-Manually deleting a running pod
+Simulated:
 
+Pod deletion
 
-Artificially failing liveness probes
+Failing probes
 
-
-Flooding pods with excess traffic
-
+Heavy traffic
 
 Results:
-Kubernetes automatically restarted terminated pods within seconds
 
+Kubernetes restarts pods automatically
 
-DNS routing seamlessly redirected requests to healthy pods
+Requests redirect to healthy replicas
 
+MongoDB maintains integrity thanks to PVC
 
-Stateful MongoDB recovered without data loss due to persistent volume claims
+🗄️ 6. Persistence Design
+6.1 MongoDB Collections
 
+users → profiles & preferences
 
-These behaviors demonstrate Kubernetes’ built-in reliability for production workloads.
+requests → raw user input
 
-6. Persistence Design & Verification
-6.1 MongoDB Schema Design
-Core collections:
-users – id, name, preferences
+itineraries → final generated plans
 
+6.2 Verification
 
-requests – raw travel preferences
+Tested insert/retrieval via backend API
 
+Verified persistence across pod restarts
 
-itineraries – final AI-generated itineraries
+Simulated MongoDB failure & rescheduling
 
+⚠️ 7. Known Limitations
 
-6.2 Verification Steps
-To ensure data integrity:
-Inserted test records using the backend API
+LLM latency under heavy load
 
+No API rate-limiting
 
-Verified per-request round-trip through MongoDB
+Geocoding not cached → higher latency
 
+Minimal authentication
 
-Ensured itinerary retrieval remained functional after pod restarts
+UI is basic
 
+Scheduler not fully developed
 
-Simulated network partition by deleting the MongoDB pod
+⭐ 8. Future Work
 
+Add Redis or Memcached
 
-6.3 Results
-PersistentVolumeClaim successfully preserved all state
+Implement OAuth authentication
 
+CI/CD with GitHub Actions + ArgoCD
 
-Backend reconnection logic worked as intended
+Add pricing/hotel/transportation data
 
+Distributed tracing with OpenTelemetry
 
-Database remained accessible across pod rescheduling events
+Autoscaling with custom CPU/memory rules
 
+Improved responsive UI
 
+🎉 Thanks for Visiting!
 
-7. Known Limitations
-LLM latency may slow itinerary generation under high load.
-
-
-No rate-limiting for external APIs.
-
-
-No Redis caching layer means repeated geocoding increases latency and cost.
-
-
-Minimal authentication—future deployments require secure user accounts.
-
-
-Frontend styling is functional but not production-grade.
-
-
-Scheduler not fully implemented (optional component).
-
-
-
-8. Future Work
-Add a Redis or Memcached caching sidecar
-
-
-Implement OAuth authentication for multi-user access
-
-
-Add continuous deployment pipelines (GitHub Actions → ArgoCD)
-
-
-Expand itinerary features (transportation, hotels, pricing estimates)
-
-
-Integrate tracing (Jaeger, OpenTelemetry)
-
-
-Deploy autoscaling rules based on custom CPU/memory thresholds
-
-
-Improve UI/UX design for mobile-friendly travel planning
-
+If you like this project, consider ⭐ starring the repo!
 
